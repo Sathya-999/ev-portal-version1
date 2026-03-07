@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Eye, EyeOff, ArrowRight, ShieldCheck, CheckCircle2, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowRight, ShieldCheck, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { GoogleLogin } from '@react-oauth/google';
@@ -183,8 +183,6 @@ export const SignIn: React.FC = () => {
 
 export const SignUp: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
-  const [isManualPassword, setIsManualPassword] = React.useState(false);
-  const [suggestedPassword, setSuggestedPassword] = React.useState('');
   const [firstName, setFirstName] = React.useState('');
   const [lastName, setLastName] = React.useState('');
   const [email, setEmail] = React.useState('');
@@ -192,22 +190,9 @@ export const SignUp: React.FC = () => {
   const [loading, setLoading] = React.useState(false);
   const navigate = useNavigate();
 
-  const generatePassword = () => {
-    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-    let retVal = "";
-    for (let i = 0, n = charset.length; i < 12; ++i) {
-      retVal += charset.charAt(Math.floor(Math.random() * n));
-    }
-    setSuggestedPassword(retVal);
-  };
-
-  React.useEffect(() => {
-    generatePassword();
-  }, []);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const password = isManualPassword ? manualPassword : suggestedPassword;
+    const password = manualPassword;
 
     if (!firstName || !lastName) {
       toast.error('Please enter your first and last name.');
@@ -275,62 +260,25 @@ export const SignUp: React.FC = () => {
           />
           
           <div className="space-y-4">
-            <div className="flex justify-between items-center px-1">
-              <label className="text-sm font-semibold text-gray-700">Password</label>
+            <label className="text-sm font-semibold text-gray-700 px-1">Password</label>
+            <div className="relative">
+              <Input 
+                placeholder="Min. 8 characters"
+                type={showPassword ? 'text' : 'password'}
+                icon={<Lock size={22} />}
+                required
+                className="text-base"
+                value={manualPassword}
+                onChange={(e) => setManualPassword(e.target.value)}
+              />
               <button 
-                type="button"
-                onClick={() => setIsManualPassword(!isManualPassword)}
-                className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
               >
-                {isManualPassword ? 'Use suggested password' : 'Choose my own'}
+                {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
               </button>
             </div>
-            
-            {!isManualPassword ? (
-              <div className="p-6 bg-blue-50/50 rounded-2xl border border-blue-100/50 flex items-center justify-between group">
-                <div className="space-y-2">
-                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Strong Suggestion</p>
-                  <code className="text-base font-bold text-blue-900 tracking-wider">
-                    {showPassword ? suggestedPassword : '••••••••••••'}
-                  </code>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button 
-                    type="button" 
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="p-2 text-blue-400 hover:text-blue-600 transition-colors"
-                  >
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={generatePassword}
-                    className="p-2 text-blue-400 hover:text-blue-600 transition-colors"
-                  >
-                    <RefreshCw size={20} className="group-hover:rotate-180 transition-transform duration-500" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="relative">
-                <Input 
-                  placeholder="Min. 8 characters"
-                  type={showPassword ? 'text' : 'password'}
-                  icon={<Lock size={22} />}
-                  required
-                  className="text-base"
-                  value={manualPassword}
-                  onChange={(e) => setManualPassword(e.target.value)}
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
-                </button>
-              </div>
-            )}
           </div>
 
           <div className="flex items-start gap-4 p-6 bg-gray-50 rounded-2xl border border-gray-100/50">
