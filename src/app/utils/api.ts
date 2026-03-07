@@ -98,30 +98,65 @@ export const fetchUserVehicles = async () => {
   ];
 };
 
-// ─── Charging History ─────────────────────────────────────────
+// ─── Charging History (from localStorage for demo) ────────────
 export const fetchChargingHistory = async () => {
+  // First try API
   try {
-    return await apiFetch("/api/payments/history");
-  } catch {
-    // Return empty if backend unavailable
-    return [];
+    const data = await apiFetch("/api/payments/history");
+    if (data && data.length > 0) return data;
+  } catch {}
+  
+  // Fallback: get from localStorage
+  const CHARGING_HISTORY_KEY_LOCAL = "ev_portal_charging_history";
+  const savedHistory = localStorage.getItem(CHARGING_HISTORY_KEY_LOCAL);
+  if (savedHistory) {
+    try {
+      return JSON.parse(savedHistory);
+    } catch {}
   }
+  return [];
 };
 
-// ─── Dashboard Summary ────────────────────────────────────────
+// ─── Dashboard Summary (Dynamic from localStorage) ────────────
 export const fetchDashboardSummary = async () => {
+  // Get charging history from localStorage
+  const CHARGING_HISTORY_KEY_LOCAL = "ev_portal_charging_history";
+  const WALLET_KEY_LOCAL = "ev_portal_wallet";
+  const TRANSACTIONS_KEY_LOCAL = "ev_portal_transactions";
+  
+  const savedHistory = localStorage.getItem(CHARGING_HISTORY_KEY_LOCAL);
+  const savedWallet = localStorage.getItem(WALLET_KEY_LOCAL);
+  const savedTransactions = localStorage.getItem(TRANSACTIONS_KEY_LOCAL);
+  
+  let history: any[] = [];
+  let transactions: any[] = [];
+  
   try {
-    return await apiFetch("/api/dashboard/summary");
-  } catch {
-    return {
-      activeStations: 0,
-      totalStations: HAWAII_CHARGERS.length,
-      totalEnergy: 0,
-      totalSessions: 0,
-      totalSpent: 0,
-      walletBalance: 0,
-    };
-  }
+    if (savedHistory) history = JSON.parse(savedHistory);
+  } catch {}
+  
+  try {
+    if (savedTransactions) transactions = JSON.parse(savedTransactions);
+  } catch {}
+  
+  // Calculate dynamic metrics
+  const totalEnergy = history.reduce((sum, h) => sum + (h.kwhUsed || h.energy || 0), 0);
+  const totalSessions = history.length;
+  const totalSpent = history.reduce((sum, h) => sum + (h.amount || 0), 0);
+  const walletBalance = savedWallet ? parseFloat(savedWallet) : 0;
+  
+  // Active stations = 21 fallback stations (always active in demo mode)
+  const activeStations = 21;
+  
+  return {
+    activeStations,
+    totalStations: 21,
+    totalEnergy: Math.round(totalEnergy * 10) / 10,
+    totalSessions,
+    totalSpent: Math.round(totalSpent * 100) / 100,
+    walletBalance,
+    recentTransactions: transactions.slice(0, 5),
+  };
 };
 
 // ─── Razorpay — Create Order via Backend ──────────────────────
