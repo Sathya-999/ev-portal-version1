@@ -36,11 +36,14 @@ router.get('/', async (req, res) => {
     if (lat && lng) {
       const userLat = parseFloat(lat);
       const userLng = parseFloat(lng);
+      const maxRadius = parseFloat(req.query.radius) || 50; // Default 50km radius
 
       result = result.map(s => ({
         ...s,
         distance: haversine(userLat, userLng, s.latitude, s.longitude),
-      })).sort((a, b) => a.distance - b.distance);
+      }))
+      .filter(s => s.distance <= maxRadius) // Only stations within radius
+      .sort((a, b) => a.distance - b.distance);
     }
 
     return res.json(result);

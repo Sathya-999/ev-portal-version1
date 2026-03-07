@@ -37,7 +37,7 @@ const userIcon = new L.Icon({
 
 const RecenterMap = ({ lat, lng }: { lat: number; lng: number }) => {
   const map = useMap();
-  useEffect(() => { map.setView([lat, lng], 11); }, [lat, lng, map]);
+  useEffect(() => { map.setView([lat, lng], 13); }, [lat, lng, map]);
   return null;
 };
 
@@ -72,7 +72,7 @@ const StationsMap: React.FC = () => {
     const loadStations = async (lat: number, lng: number) => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`${API_BASE}/api/stations?lat=${lat}&lng=${lng}`, {
+        const res = await fetch(`${API_BASE}/api/stations?lat=${lat}&lng=${lng}&radius=50`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (res.ok) {
@@ -124,7 +124,7 @@ const StationsMap: React.FC = () => {
           {/* Map */}
           <div className="lg:col-span-3">
             <Card className="border-none shadow-xl overflow-hidden rounded-2xl h-[600px]">
-              <MapContainer center={[center.lat, center.lng]} zoom={6} scrollWheelZoom className="h-full w-full z-0">
+              <MapContainer center={[center.lat, center.lng]} zoom={13} scrollWheelZoom className="h-full w-full z-0">
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
