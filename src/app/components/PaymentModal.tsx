@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { useNavigate } from "react-router-dom";
 import { 
   X, 
   ShieldCheck, 
@@ -22,12 +23,14 @@ import {
   formatINR,
   fetchUserVehicles,
   fetchWalletBalance,
-  payViaWallet
+  payViaWallet,
+  recordChargingSession
 } from "../utils/api";
 
 interface PaymentModalProps {
   amount: number;
   chargePercent?: number;
+  stationName?: string;
   onSuccess: () => void;
   onClose: () => void;
 }
@@ -61,7 +64,8 @@ const validateUpiVPA = (upi: string): { valid: boolean; error: string } => {
   return { valid: true, error: "" };
 };
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({ amount, chargePercent, onSuccess, onClose }) => {
+export const PaymentModal: React.FC<PaymentModalProps> = ({ amount, chargePercent, stationName = "EV Charging Station", onSuccess, onClose }) => {
+  const navigate = useNavigate();
   const [upiId, setUpiId] = useState("");
   const [upiError, setUpiError] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -133,34 +137,38 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ amount, chargePercen
       const ref = `EVTX/${new Date().getFullYear()}/${order.id.slice(-8).toUpperCase()}`;
       setTxnRef(ref);
       setStep("QR_SCAN");
-      setCountdown(120);
+      setCountdown(300); // 5 minutes to complete payment
       setProcessing(false);
-
-      // ACID Step 2: Wait for payment confirmation via QR scan
-      // Simulated auto-confirm after 5s (in production, webhook confirms)
-      setTimeout(async () => {
-        setStep("PROCESSING");
-        try {
-          // ACID Step 3: Confirm payment — server uses DB transaction
-          // (Atomicity: wallet credit + txn record in single transaction)
-          // (Consistency: balance checked, RBI limits enforced)
-          // (Isolation: row-level locking on wallet)
-          // (Durability: committed to MySQL InnoDB)
-          const payId = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-          await verifyPaymentSignature(order.id, payId, "sig_hmac_rbi_valid", totalAmount);
-          
-          // ACID Step 4: Success — all or nothing
-          setStep("SUCCESS");
-          onSuccess();
-        } catch (err: any) {
-          // ACID: Failure = full rollback (server handles this)
-          toast.error("Payment failed. Amount NOT debited. (ACID Rollback)");
-          setStep("CALC");
-        }
-      }, 5000);
     } catch (e: any) {
       toast.error(e.message || "Payment failed.");
       setProcessing(false);
+    }
+  };
+
+  // ─── UPI Payment Confirmation Handler ─────────────────────────
+  const confirmUpiPayment = async () => {
+    setStep("PROCESSING");
+    try {
+      // Verify payment and record transaction
+      const payId = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      await verifyPaymentSignature(txnRef, payId, "sig_hmac_rbi_valid", totalAmount);
+      
+      // Record charging session
+      recordChargingSession({
+        stationName: stationName,
+        chargePercent: chargeNeeded,
+        kwhUsed: kwhNeeded,
+        amount: totalAmount,
+        paymentMethod: "UPI",
+        transactionRef: txnRef,
+      });
+      
+      setStep("SUCCESS");
+      toast.success("Payment Successful! Charging session started.");
+      onSuccess();
+    } catch (err: any) {
+      toast.error("Payment verification failed. Please try again.");
+      setStep("QR_SCAN");
     }
   };
 
@@ -291,8 +299,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ amount, chargePercen
                   }
                   setWalletLoading(true);
                   try {
-                    await payViaWallet(totalAmount, `EV Charging ${chargeNeeded}%`, `Charging ${chargeNeeded}% — ${vehicleName}`);
-                    toast.success(`₹${totalAmount} paid from wallet!`);
+                    const result = await payViaWallet(totalAmount, stationName, `Charging ${chargeNeeded}% — ${vehicleName}`);
+                    
+                    // Record charging session
+                    recordChargingSession({
+                      stationName: stationName,
+                      chargePercent: chargeNeeded,
+                      kwhUsed: kwhNeeded,
+                      amount: totalAmount,
+                      paymentMethod: "WALLET",
+                      transactionRef: result.transaction?.id,
+                    });
+                    
+                    // Update displayed wallet balance
+                    setWalletBalance(result.newBalance);
+                    
+                    toast.success("Payment Successful! Charging session started.");
                     setStep("SUCCESS");
                     onSuccess();
                   } catch (err: any) {
@@ -311,6 +333,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ amount, chargePercen
               >
                 {walletLoading ? (
                   <><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>PAYING...</>
+                ) : walletBalance < totalAmount ? (
+                  <>
+                    <AlertCircle size={18} />
+                    INSUFFICIENT BALANCE ({formatINR(walletBalance)})
+                  </>
                 ) : (
                   <>
                     <IndianRupee size={18} />
@@ -318,6 +345,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ amount, chargePercen
                   </>
                 )}
               </Button>
+              
+              {/* Insufficient balance message */}
+              {walletBalance < totalAmount && (
+                <p className="text-xs text-red-500 font-medium text-center">
+                  Insufficient wallet balance. Please recharge wallet.
+                </p>
+              )}
             </div>
           )}
 
@@ -375,11 +409,29 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ amount, chargePercen
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-[#5F259F] rounded-full animate-pulse"></div>
                   <p className="text-xs font-black text-gray-500">
-                    {countdown > 0 ? `Awaiting payment... ${Math.floor(countdown/60)}:${(countdown%60).toString().padStart(2,'0')}` : "Processing..."}
+                    {countdown > 0 ? `Awaiting payment... ${Math.floor(countdown/60)}:${(countdown%60).toString().padStart(2,'0')}` : "Time expired"}
                   </p>
                 </div>
                 <p className="text-[10px] text-gray-400">Open PhonePe / GPay / Paytm and scan QR</p>
               </div>
+
+              {/* I Have Completed Payment Button */}
+              <Button
+                onClick={confirmUpiPayment}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 py-6 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-200 flex items-center justify-center gap-3 text-white"
+              >
+                <CheckCircle2 size={20} />
+                I HAVE COMPLETED PAYMENT
+              </Button>
+
+              {/* Cancel Button */}
+              <Button
+                onClick={() => setStep("CALC")}
+                variant="ghost"
+                className="w-full py-4 text-gray-500 font-bold"
+              >
+                Cancel & Go Back
+              </Button>
             </div>
           )}
 
@@ -412,21 +464,32 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ amount, chargePercen
               </div>
               <div>
                 <h3 className="text-2xl font-black text-gray-900 tracking-tight mb-1">Payment Successful!</h3>
-                <p className="text-xs font-black text-emerald-600 uppercase tracking-widest">ACID COMMITTED</p>
+                <p className="text-xs font-black text-emerald-600 uppercase tracking-widest">CHARGING SESSION STARTED</p>
               </div>
               <div className="bg-gray-50 rounded-2xl border border-gray-100 p-5 space-y-3 text-left">
                 <div className="flex justify-between text-sm"><span className="text-gray-400 font-bold">Amount Paid</span><span className="text-emerald-600 font-black text-lg">{formatINR(totalAmount)}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-gray-400 font-bold">Station</span><span className="font-black text-gray-900">{stationName}</span></div>
                 <div className="flex justify-between text-xs"><span className="text-gray-400 font-bold">Charge Added</span><span className="font-black text-gray-900">{chargeNeeded}% ({kwhNeeded.toFixed(1)} kWh)</span></div>
-                <div className="flex justify-between text-xs"><span className="text-gray-400 font-bold">Txn Ref</span><span className="font-bold text-[#5F259F]">{txnRef}</span></div>
-                <div className="flex justify-between text-xs"><span className="text-gray-400 font-bold">Payee</span><span className="font-bold text-gray-700">K SATHISH REDDY</span></div>
-                <div className="flex justify-between text-xs"><span className="text-gray-400 font-bold">Currency</span><span className="font-bold text-gray-700">INR (₹)</span></div>
-                <div className="flex justify-between text-xs"><span className="text-gray-400 font-bold">ACID</span>
-                  <span className="font-black text-emerald-600 flex items-center gap-1"><BadgeCheck size={12} />COMMITTED & DURABLE</span>
+                <div className="flex justify-between text-xs"><span className="text-gray-400 font-bold">Txn Ref</span><span className="font-bold text-[#5F259F]">{txnRef || `TXN_${Date.now()}`}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-gray-400 font-bold">Status</span>
+                  <span className="font-black text-emerald-600 flex items-center gap-1"><BadgeCheck size={12} />SUCCESS</span>
                 </div>
               </div>
-              <Button onClick={onClose} className="w-full bg-[#5F259F] hover:bg-[#4A1D7A] py-6 rounded-2xl font-black text-sm uppercase tracking-widest text-white">
-                RETURN TO DASHBOARD
-              </Button>
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => { onClose(); navigate("/dashboard/history"); }} 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 py-6 rounded-2xl font-black text-sm uppercase tracking-widest text-white"
+                >
+                  VIEW CHARGING HISTORY
+                </Button>
+                <Button 
+                  onClick={onClose} 
+                  variant="outline"
+                  className="w-full py-4 rounded-2xl font-bold text-sm text-gray-600"
+                >
+                  Return to Dashboard
+                </Button>
+              </div>
             </div>
           )}
         </div>

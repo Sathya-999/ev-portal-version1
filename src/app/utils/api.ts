@@ -133,27 +133,103 @@ export const createRazorpayOrder = async (amount: number, purpose: string = "Wal
   });
 };
 
-// ─── Wallet — Fetch Balance ───────────────────────────────────
+// ─── Local Storage Keys (Demo Mode) ──────────────────────────
+const WALLET_STORAGE_KEY = "ev_portal_wallet";
+const TRANSACTIONS_STORAGE_KEY = "ev_portal_transactions";
+const CHARGING_HISTORY_KEY = "ev_portal_charging_history";
+
+// ─── Wallet — Fetch Balance (Demo: localStorage) ─────────────
 export const fetchWalletBalance = async () => {
-  // Don't swallow errors - let caller handle them
-  return await apiFetch("/api/wallet/balance");
+  // Use localStorage for demo mode - same as Wallet.tsx
+  const savedBalance = localStorage.getItem(WALLET_STORAGE_KEY);
+  return { balance: savedBalance ? parseFloat(savedBalance) : 0 };
 };
 
-// ─── Wallet — Fetch Transactions ──────────────────────────────
+// ─── Wallet — Fetch Transactions (Demo: localStorage) ─────────
 export const fetchWalletTransactions = async () => {
-  try {
-    return await apiFetch("/api/wallet/transactions");
-  } catch {
-    return [];
+  const savedTransactions = localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
+  if (savedTransactions) {
+    try {
+      return JSON.parse(savedTransactions);
+    } catch {
+      return [];
+    }
   }
+  return [];
 };
 
-// ─── Wallet — Pay for Charging ────────────────────────────────
+// ─── Wallet — Pay for Charging (Demo: localStorage) ───────────
 export const payViaWallet = async (amount: number, stationName: string, description?: string) => {
-  return await apiFetch("/api/wallet/pay", {
-    method: "POST",
-    body: JSON.stringify({ amount, stationName, description }),
-  });
+  const savedBalance = localStorage.getItem(WALLET_STORAGE_KEY);
+  const currentBalance = savedBalance ? parseFloat(savedBalance) : 0;
+  
+  if (currentBalance < amount) {
+    throw new Error(`Insufficient wallet balance. You have ₹${currentBalance.toFixed(2)}`);
+  }
+  
+  // Deduct amount from wallet
+  const newBalance = currentBalance - amount;
+  localStorage.setItem(WALLET_STORAGE_KEY, newBalance.toString());
+  
+  // Add transaction record
+  const savedTransactions = localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
+  const transactions = savedTransactions ? JSON.parse(savedTransactions) : [];
+  
+  const newTransaction = {
+    id: `txn_${Date.now()}`,
+    date: new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }),
+    type: "CHARGE",
+    amount: amount,
+    status: "SUCCESS",
+    stationName: stationName,
+    description: description,
+  };
+  
+  const updatedTransactions = [newTransaction, ...transactions];
+  localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(updatedTransactions));
+  
+  return { 
+    success: true, 
+    newBalance: newBalance,
+    transaction: newTransaction
+  };
+};
+
+// ─── Charging Session — Record (Demo: localStorage) ───────────
+export const recordChargingSession = (session: {
+  stationName: string;
+  chargePercent: number;
+  kwhUsed: number;
+  amount: number;
+  paymentMethod: "UPI" | "WALLET";
+  transactionRef?: string;
+}) => {
+  const savedHistory = localStorage.getItem(CHARGING_HISTORY_KEY);
+  const history = savedHistory ? JSON.parse(savedHistory) : [];
+  
+  const newSession = {
+    id: `session_${Date.now()}`,
+    date: new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }),
+    time: new Date().toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    ...session,
+    status: "COMPLETED",
+  };
+  
+  const updatedHistory = [newSession, ...history];
+  localStorage.setItem(CHARGING_HISTORY_KEY, JSON.stringify(updatedHistory));
+  
+  return newSession;
 };
 
 // ─── Razorpay — Verify & Confirm Payment ──────────────────────
