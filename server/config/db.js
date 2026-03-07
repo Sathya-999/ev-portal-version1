@@ -3,15 +3,17 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Support DATABASE_URL (Railway) or individual vars (local)
+// Support DATABASE_URL (Railway/Render) or individual vars (local)
 let sequelize;
 
 if (process.env.DATABASE_URL) {
+  // Auto-detect dialect from URL (postgres:// or mysql://)
+  const dialect = process.env.DATABASE_URL.startsWith('postgres') ? 'postgres' : 'mysql';
   sequelize = new Sequelize(process.env.DATABASE_URL, {
-    dialect: 'mysql',
+    dialect,
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     dialectOptions: {
-      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      ssl: process.env.DB_SSL !== 'false' ? { rejectUnauthorized: false } : false,
     },
     pool: {
       max: 10,
