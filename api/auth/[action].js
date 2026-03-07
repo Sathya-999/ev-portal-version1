@@ -13,20 +13,23 @@ const corsHeaders = {
 };
 
 export default async function handler(req, res) {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(200).json({});
-  }
-
   // Set CORS headers
   Object.entries(corsHeaders).forEach(([key, value]) => {
     res.setHeader(key, value);
   });
 
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   const { action } = req.query;
 
   try {
-    if (action === 'signup' && req.method === 'POST') {
+    if (action === 'signup') {
+      if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+      }
       const { firstName, lastName, email, password } = req.body;
 
       if (!firstName || !lastName || !email || !password) {
@@ -59,7 +62,10 @@ export default async function handler(req, res) {
       });
     }
 
-    if (action === 'login' && req.method === 'POST') {
+    if (action === 'login') {
+      if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+      }
       const { email, password } = req.body;
 
       if (!email || !password) {
