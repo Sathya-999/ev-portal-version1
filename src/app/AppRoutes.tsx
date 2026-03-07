@@ -13,6 +13,7 @@ import StationsMap from "./components/StationsMap";
 import DynamicLoadControl from "./components/DynamicLoadControl";
 import SettingsPage from "./components/SettingsPage";
 import SlotBooking from "./components/SlotBooking";
+import Wallet from "./components/Wallet";
 
 // Protected Route Logic — checks for JWT token
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -43,6 +44,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/dashboard/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/dashboard/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path="/dashboard/slot-booking" element={<ProtectedRoute><SlotBooking /></ProtectedRoute>} />
+      <Route path="/dashboard/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/signin" replace />} />
     </Routes>

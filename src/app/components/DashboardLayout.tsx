@@ -15,7 +15,8 @@ import {
   Map,
   Gauge,
   Settings,
-  CalendarCheck
+  CalendarCheck,
+  Wallet
 } from "lucide-react";
 import { cn } from "./ui/utils";
 import { Button } from "./ui/button";
@@ -146,6 +147,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     { icon: CalendarCheck, label: "Slot Booking", href: "/dashboard/slot-booking" },
     { icon: Gauge, label: "Load Control", href: "/dashboard/load-control" },
     { icon: History, label: "Charging History", href: "/dashboard/history" },
+    { icon: Wallet, label: "Wallet", href: "/dashboard/wallet" },
     { icon: User, label: "Profile", href: "/dashboard/profile" },
     { icon: Settings, label: "Settings", href: "/dashboard/settings" },
   ];
