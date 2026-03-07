@@ -76,26 +76,27 @@ const AuthCard: React.FC<{ children: React.ReactNode, title: string, subtitle: s
 
 export const SignIn: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const emailInput = (e.target as any).elements[0].value;
-    const passwordInput = (e.target as any).elements[1]?.value || "";
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailInput)) {
+    if (!emailRegex.test(email)) {
       toast.error("Invalid email format. Please use a valid address.");
       return;
     }
-    if (!passwordInput) {
+    if (!password) {
       toast.error("Please enter your password.");
       return;
     }
 
+    setLoading(true);
     try {
-      const result = await apiLogin({ email: emailInput, password: passwordInput });
-      // Only redirect if backend returned a valid token (pwd matched in DB)
+      const result = await apiLogin({ email, password });
       if (!result.token) {
         toast.error("Authentication failed. Server did not issue a token.");
         return;
@@ -103,8 +104,9 @@ export const SignIn: React.FC = () => {
       toast.success(`Welcome back, ${result.user.firstName}! Redirecting...`);
       setTimeout(() => navigate("/dashboard"), 600);
     } catch (err: any) {
-      // Backend returns 401 if password != db.passwordHash
       toast.error(err.message || "Invalid email or password. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -136,6 +138,8 @@ export const SignIn: React.FC = () => {
             type="email"
             icon={<Mail size={22} />}
             required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="text-base"
           />
           <div className="space-y-3">
@@ -149,6 +153,8 @@ export const SignIn: React.FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 icon={<Lock size={22} />}
                 required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="text-base"
               />
               <button 
@@ -160,8 +166,8 @@ export const SignIn: React.FC = () => {
               </button>
             </div>
           </div>
-          <Button fullWidth className="h-[58px] text-[18px] font-black mt-5 shadow-lg shadow-blue-500/20">
-            Sign In
+          <Button fullWidth className="h-[58px] text-[18px] font-black mt-5 shadow-lg shadow-blue-500/20" disabled={loading}>
+            {loading ? 'Signing In...' : 'Sign In'}
             <ArrowRight size={24} />
           </Button>
         </form>
@@ -179,6 +185,11 @@ export const SignUp: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
   const [isManualPassword, setIsManualPassword] = React.useState(false);
   const [suggestedPassword, setSuggestedPassword] = React.useState('');
+  const [firstName, setFirstName] = React.useState('');
+  const [lastName, setLastName] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [manualPassword, setManualPassword] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
   const navigate = useNavigate();
 
   const generatePassword = () => {
@@ -196,23 +207,24 @@ export const SignUp: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const form = e.target as HTMLFormElement;
-    const firstName = (form.elements[0] as HTMLInputElement).value;
-    const lastName = (form.elements[1] as HTMLInputElement).value;
-    const email = (form.elements[2] as HTMLInputElement).value;
-    // Get password: either from suggested or manual input
-    const password = isManualPassword
-      ? (form.elements[3] as HTMLInputElement)?.value || ""
-      : suggestedPassword;
+    const password = isManualPassword ? manualPassword : suggestedPassword;
 
+    if (!firstName || !lastName) {
+      toast.error('Please enter your first and last name.');
+      return;
+    }
+    if (!email) {
+      toast.error('Please enter your email address.');
+      return;
+    }
     if (!password || password.length < 8) {
       toast.error('Password must be at least 8 characters.');
       return;
     }
 
+    setLoading(true);
     try {
       const result = await apiSignup({ firstName, lastName, email, password });
-      // Store signup data in localStorage so profile is pre-filled
       localStorage.setItem('user_profile', JSON.stringify(result.user));
       toast.success(`Welcome, ${result.user.firstName}! Account created successfully!`);
       setTimeout(() => {
@@ -220,6 +232,8 @@ export const SignUp: React.FC = () => {
       }, 800);
     } catch (err: any) {
       toast.error(err.message || 'Signup failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -246,8 +260,8 @@ export const SignUp: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-5">
-            <Input label="First Name" placeholder="Alex" required className="text-base" />
-            <Input label="Last Name" placeholder="Smith" required className="text-base" />
+            <Input label="First Name" placeholder="Alex" required className="text-base" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            <Input label="Last Name" placeholder="Smith" required className="text-base" value={lastName} onChange={(e) => setLastName(e.target.value)} />
           </div>
           <Input 
             label="Email Address"
@@ -256,6 +270,8 @@ export const SignUp: React.FC = () => {
             icon={<Mail size={22} />}
             required
             className="text-base"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
           
           <div className="space-y-4">
@@ -303,6 +319,8 @@ export const SignUp: React.FC = () => {
                   icon={<Lock size={22} />}
                   required
                   className="text-base"
+                  value={manualPassword}
+                  onChange={(e) => setManualPassword(e.target.value)}
                 />
                 <button 
                   type="button" 
@@ -321,8 +339,8 @@ export const SignUp: React.FC = () => {
               I agree to the <span className="text-blue-600 font-bold cursor-pointer">Terms</span> and <span className="text-blue-600 font-bold cursor-pointer">Privacy Policy</span>.
             </p>
           </div>
-          <Button fullWidth className="h-[56px] text-[17px] font-bold mt-5 shadow-lg shadow-blue-500/20">
-            Create Account
+          <Button fullWidth className="h-[56px] text-[17px] font-bold mt-5 shadow-lg shadow-blue-500/20" disabled={loading}>
+            {loading ? 'Creating Account...' : 'Create Account'}
             <ArrowRight size={24} />
           </Button>
         </form>
