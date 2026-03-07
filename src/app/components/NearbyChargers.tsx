@@ -128,13 +128,48 @@ const NearbyChargers: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationName, setLocationName] = useState<string>("Detecting location...");
 
   useEffect(() => {
     // 1. Get user location
     const fallbackLat = 13.0827;
     const fallbackLng = 80.2707;
 
+    // Function to decode location using OpenCage API
+    const decodeLocation = async (lat: number, lng: number) => {
+      try {
+        const OPENCAGE_API_KEY = "8308a66a7b2847a4b91623183b07794c";
+        const response = await fetch(
+          `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${OPENCAGE_API_KEY}`
+        );
+        const data = await response.json();
+        if (data.results && data.results.length > 0) {
+          const loc = data.results[0].formatted;
+          setLocationName(loc);
+        } else {
+          setLocationName(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        }
+      } catch {
+        setLocationName(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      }
+    };
+
+    // Function to calculate distance and sort stations
+    const processStations = (stationsData: Station[], userLat: number, userLng: number): Station[] => {
+      // Calculate distance for each station using Haversine formula
+      const stationsWithDistance = stationsData.map(station => ({
+        ...station,
+        distance: Math.round(haversine(userLat, userLng, station.latitude, station.longitude) * 10) / 10
+      }));
+
+      // Sort by distance in ascending order (nearest first)
+      return stationsWithDistance.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    };
+
     const loadStations = async (lat: number, lng: number) => {
+      // Decode location name
+      decodeLocation(lat, lng);
+
       try {
         const token = localStorage.getItem("token");
         const res = await fetch(`${API_BASE}/api/stations?lat=${lat}&lng=${lng}&radius=100`, {
@@ -144,9 +179,11 @@ const NearbyChargers: React.FC = () => {
           const data: Station[] = await res.json();
           // If we have fewer than 21 stations, use fallback
           if (data.length >= 21) {
-            setStations(data);
+            // Recalculate distances from user's actual GPS and sort
+            const sortedStations = processStations(data, lat, lng);
+            setStations(sortedStations);
           } else {
-            // Use fallback generated stations
+            // Use fallback generated stations (already sorted by distance)
             setStations(generateFallbackStations(lat, lng));
           }
         } else {
@@ -197,6 +234,16 @@ const NearbyChargers: React.FC = () => {
           <p className="text-gray-500 font-medium mt-1">
             Sorted by distance from your current location (nearest first).
           </p>
+          {/* User Location Display */}
+          {userLoc && (
+            <div className="mt-3 flex items-center gap-2 text-sm">
+              <MapPin size={16} className="text-[#5F259F]" />
+              <span className="font-bold text-gray-700">{locationName}</span>
+              <span className="text-xs text-gray-400">
+                ({userLoc.lat.toFixed(4)}, {userLoc.lng.toFixed(4)})
+              </span>
+            </div>
+          )}
         </div>
 
         {stations.length === 0 ? (
