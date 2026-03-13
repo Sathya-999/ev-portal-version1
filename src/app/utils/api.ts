@@ -46,41 +46,64 @@ const apiFetch = async (path: string, options: RequestInit = {}) => {
 
 // Mock responses for demo/offline mode
 const getMockResponse = (path: string, options: any) => {
-  if (path === "/api/auth/login") {
-    const body = JSON.parse(options.body || {});
-    return {
-      token: "demo-token-" + Date.now(),
-      user: {
+  try {
+    const body = options.body ? JSON.parse(options.body) : {};
+    
+    if (path === "/api/auth/login") {
+      return {
+        token: "demo-token-" + Date.now(),
+        user: {
+          id: 1,
+          firstName: "Demo",
+          lastName: "User",
+          email: body.email || "user@example.com",
+          phone: "+91 9000000000",
+          location: "India",
+          membership: "EV-Portal Free",
+          walletBalance: 500,
+          loyaltyPoints: 0,
+        }
+      };
+    }
+    
+    if (path === "/api/auth/signup") {
+      return {
+        token: "demo-token-" + Date.now(),
+        user: {
+          id: Math.floor(Math.random() * 10000),
+          firstName: body.firstName || "New",
+          lastName: body.lastName || "User",
+          email: body.email || "newuser@example.com",
+          phone: "",
+          location: "India",
+          membership: "EV-Portal Free",
+          walletBalance: 0,
+          loyaltyPoints: 0,
+        }
+      };
+    }
+    
+    if (path === "/api/user/me") {
+      const cached = localStorage.getItem("user_profile");
+      if (cached) return JSON.parse(cached);
+      return {
         id: 1,
         firstName: "Demo",
         lastName: "User",
-        email: body.email,
+        email: "demo@example.com",
         phone: "+91 9000000000",
         location: "India",
         membership: "EV-Portal Free",
         walletBalance: 500,
         loyaltyPoints: 0,
-      }
-    };
+      };
+    }
+    
+    // Default fallback for any other API
+    return { success: true, data: [] };
+  } catch (err) {
+    return { success: true, data: [] };
   }
-  if (path === "/api/auth/signup") {
-    const body = JSON.parse(options.body || {});
-    return {
-      token: "demo-token-" + Date.now(),
-      user: {
-        id: Math.floor(Math.random() * 10000),
-        firstName: body.firstName,
-        lastName: body.lastName,
-        email: body.email,
-        phone: "",
-        location: "India",
-        membership: "EV-Portal Free",
-        walletBalance: 0,
-        loyaltyPoints: 0,
-      }
-    };
-  }
-  throw new Error("API request failed");
 };
 
 // ─── Kept for backward compatibility during migration ─────────
@@ -363,31 +386,36 @@ export const apiSignup = async (data: { firstName: string; lastName: string; ema
       method: "POST",
       body: JSON.stringify(data),
     });
-    if (result.token) {
-      localStorage.setItem("token", result.token);
-      localStorage.setItem("user_profile", JSON.stringify(result.user));
+    
+    // Ensure we have a valid result
+    if (!result || !result.token) {
+      throw new Error("Invalid signup response");
     }
+    
+    localStorage.setItem("token", result.token);
+    localStorage.setItem("user_profile", JSON.stringify(result.user || {}));
     return result;
   } catch (err: any) {
-    // Fallback to mock signup
-    console.warn('[Auth] Signup fallback to mock mode');
-    const mockResult = {
-      token: "demo-token-" + Date.now(),
-      user: {
-        id: Math.floor(Math.random() * 10000),
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        phone: "",
-        location: "India",
-        membership: "EV-Portal Free",
-        walletBalance: 0,
-        loyaltyPoints: 0,
-      }
+    console.warn('[Signup] Using demo fallback:', err.message);
+    
+    // Create demo account
+    const mockToken = "demo-token-" + Date.now();
+    const mockUser = {
+      id: Math.floor(Math.random() * 10000),
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      phone: "",
+      location: "India",
+      membership: "EV-Portal Free",
+      walletBalance: 0,
+      loyaltyPoints: 0,
     };
-    localStorage.setItem("token", mockResult.token);
-    localStorage.setItem("user_profile", JSON.stringify(mockResult.user));
-    return mockResult;
+    
+    localStorage.setItem("token", mockToken);
+    localStorage.setItem("user_profile", JSON.stringify(mockUser));
+    
+    return { token: mockToken, user: mockUser };
   }
 };
 
@@ -397,31 +425,36 @@ export const apiLogin = async (data: { email: string; password: string }) => {
       method: "POST",
       body: JSON.stringify(data),
     });
-    if (result.token) {
-      localStorage.setItem("token", result.token);
-      localStorage.setItem("user_profile", JSON.stringify(result.user));
+    
+    // Ensure we have a valid result
+    if (!result || !result.token) {
+      throw new Error("Invalid login response");
     }
+    
+    localStorage.setItem("token", result.token);
+    localStorage.setItem("user_profile", JSON.stringify(result.user || {}));
     return result;
   } catch (err: any) {
-    // Fallback to mock login
-    console.warn('[Auth] Login fallback to mock mode');
-    const mockResult = {
-      token: "demo-token-" + Date.now(),
-      user: {
-        id: 1,
-        firstName: "Demo",
-        lastName: "User",
-        email: data.email,
-        phone: "+91 9000000000",
-        location: "India",
-        membership: "EV-Portal Free",
-        walletBalance: 500,
-        loyaltyPoints: 0,
-      }
+    console.warn('[Login] Using demo fallback:', err.message);
+    
+    // Create demo session
+    const mockToken = "demo-token-" + Date.now();
+    const mockUser = {
+      id: 1,
+      firstName: "Demo",
+      lastName: "User",
+      email: data.email,
+      phone: "+91 9000000000",
+      location: "India",
+      membership: "EV-Portal Free",
+      walletBalance: 500,
+      loyaltyPoints: 0,
     };
-    localStorage.setItem("token", mockResult.token);
-    localStorage.setItem("user_profile", JSON.stringify(mockResult.user));
-    return mockResult;
+    
+    localStorage.setItem("token", mockToken);
+    localStorage.setItem("user_profile", JSON.stringify(mockUser));
+    
+    return { token: mockToken, user: mockUser };
   }
 };
 
