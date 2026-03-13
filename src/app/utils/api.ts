@@ -90,11 +90,26 @@ const getMockResponse = (path: string, options: any) => {
     if (path === "/api/user/me") {
       const cached = localStorage.getItem("user_profile");
       if (cached) return JSON.parse(cached);
+      
+      // Try to get firstName from email in localStorage
+      const token = localStorage.getItem("token");
+      let email = "user@example.com";
+      let firstName = "User";
+      
+      try {
+        const cachedUser = localStorage.getItem("user_profile");
+        if (cachedUser) {
+          const parsed = JSON.parse(cachedUser);
+          email = parsed.email || email;
+          firstName = parsed.firstName || firstName;
+        }
+      } catch {}
+      
       return {
         id: 1,
-        firstName: "Demo",
+        firstName: firstName,
         lastName: "User",
-        email: "demo@example.com",
+        email: email,
         phone: "+91 9000000000",
         location: "India",
         membership: "EV-Portal Free",
