@@ -398,12 +398,12 @@ export const apiSignup = async (data: { firstName: string; lastName: string; ema
   } catch (err: any) {
     console.warn('[Signup] Using demo fallback:', err.message);
     
-    // Create demo account
+    // Use actual form data
     const mockToken = "demo-token-" + Date.now();
     const mockUser = {
       id: Math.floor(Math.random() * 10000),
-      firstName: data.firstName,
-      lastName: data.lastName,
+      firstName: data.firstName || "User",
+      lastName: data.lastName || "",
       email: data.email,
       phone: "",
       location: "India",
@@ -437,11 +437,14 @@ export const apiLogin = async (data: { email: string; password: string }) => {
   } catch (err: any) {
     console.warn('[Login] Using demo fallback:', err.message);
     
-    // Create demo session
+    // Extract first name from email
+    const firstName = data.email.split('@')[0].charAt(0).toUpperCase() + data.email.split('@')[0].slice(1);
+    
+    // Create demo session with user's email
     const mockToken = "demo-token-" + Date.now();
     const mockUser = {
       id: 1,
-      firstName: "Demo",
+      firstName: firstName,
       lastName: "User",
       email: data.email,
       phone: "+91 9000000000",
