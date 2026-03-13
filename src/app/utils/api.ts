@@ -4,6 +4,7 @@
 import { toast } from "sonner";
 import { HAWAII_CHARGERS } from "./chargerUtils";
 
+// Use relative URLs for Vercel deployment, or VITE_API_URL if provided
 export const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export const getAuthToken = () => localStorage.getItem("token");
