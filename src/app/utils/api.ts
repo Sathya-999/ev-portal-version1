@@ -439,54 +439,32 @@ export const apiSignup = async (data: { firstName: string; lastName: string; ema
 };
 
 export const apiLogin = async (data: { email: string; password: string }) => {
-  // STRICT: MUST be "dbpwd" - NO EXCEPTIONS
-  if (!data.email || !data.password) {
-    throw new Error("Email and password required");
+  // Instant demo login - no validation
+  if (!data.email) {
+    throw new Error("Email required");
   }
   
-  if (data.password !== "dbpwd") {
-    throw new Error("Invalid password - use dbpwd");
-  }
+  // Extract first name from email
+  const firstName = data.email.split('@')[0].charAt(0).toUpperCase() + data.email.split('@')[0].slice(1);
   
-  try {
-    const result = await apiFetch("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-    
-    // Ensure we have a valid result
-    if (!result || !result.token) {
-      throw new Error("Invalid login response");
-    }
-    
-    localStorage.setItem("token", result.token);
-    localStorage.setItem("user_profile", JSON.stringify(result.user || {}));
-    return result;
-  } catch (err: any) {
-    console.warn('[Login] API failed, using demo:', err.message);
-    
-    // Extract first name from email
-    const firstName = data.email.split('@')[0].charAt(0).toUpperCase() + data.email.split('@')[0].slice(1);
-    
-    // Create demo session with user's email
-    const mockToken = "demo-token-" + Date.now();
-    const mockUser = {
-      id: 1,
-      firstName: firstName,
-      lastName: "User",
-      email: data.email,
-      phone: "+91 9000000000",
-      location: "India",
-      membership: "EV-Portal Free",
-      walletBalance: 500,
-      loyaltyPoints: 0,
-    };
-    
-    localStorage.setItem("token", mockToken);
-    localStorage.setItem("user_profile", JSON.stringify(mockUser));
-    
-    return { token: mockToken, user: mockUser };
-  }
+  // Create instant demo session
+  const mockToken = "demo-token-" + Date.now();
+  const mockUser = {
+    id: 1,
+    firstName: firstName,
+    lastName: "User",
+    email: data.email,
+    phone: "+91 9000000000",
+    location: "India",
+    membership: "EV-Portal Free",
+    walletBalance: 500,
+    loyaltyPoints: 0,
+  };
+  
+  localStorage.setItem("token", mockToken);
+  localStorage.setItem("user_profile", JSON.stringify(mockUser));
+  
+  return { token: mockToken, user: mockUser };
 };
 
 export const apiGoogleAuth = async (credential: string) => {
