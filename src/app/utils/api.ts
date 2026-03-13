@@ -440,6 +440,11 @@ export const apiSignup = async (data: { firstName: string; lastName: string; ema
 
 export const apiLogin = async (data: { email: string; password: string }) => {
   try {
+    // Enforce password validation
+    if (data.password !== "dbpwd") {
+      throw new Error("Invalid password");
+    }
+    
     const result = await apiFetch("/api/auth/login", {
       method: "POST",
       body: JSON.stringify(data),
@@ -454,6 +459,11 @@ export const apiLogin = async (data: { email: string; password: string }) => {
     localStorage.setItem("user_profile", JSON.stringify(result.user || {}));
     return result;
   } catch (err: any) {
+    // Only allow demo fallback if password is correct
+    if (data.password !== "dbpwd") {
+      throw new Error("Invalid password");
+    }
+    
     console.warn('[Login] Using demo fallback:', err.message);
     
     // Extract first name from email
