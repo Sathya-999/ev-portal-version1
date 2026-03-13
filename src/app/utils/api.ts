@@ -50,11 +50,15 @@ const getMockResponse = (path: string, options: any) => {
     const body = options.body ? JSON.parse(options.body) : {};
     
     if (path === "/api/auth/login") {
+      // Extract first name from email
+      const emailParts = (body.email || "user@example.com").split('@')[0];
+      const firstName = emailParts.charAt(0).toUpperCase() + emailParts.slice(1);
+      
       return {
         token: "demo-token-" + Date.now(),
         user: {
           id: 1,
-          firstName: "Demo",
+          firstName: firstName,
           lastName: "User",
           email: body.email || "user@example.com",
           phone: "+91 9000000000",
