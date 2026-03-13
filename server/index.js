@@ -13,7 +13,7 @@ import chatbotRoutes from './routes/chatbot.js';
 import slotsRoutes from './routes/slots.js';
 import walletRoutes from './routes/wallet.js';
 import { sendPasswordResetEmail } from './services/emailService.js';
-import { Station, ChargerSlot } from './models/index.js';
+import { Station, ChargerSlot, User, Wallet } from './models/index.js';
 
 dotenv.config();
 
@@ -130,6 +130,23 @@ const start = async () => {
       }
       await ChargerSlot.bulkCreate(slotRows);
       console.log(`[Seed] ✅ ${slotRows.length} charger slots inserted (4 per station).`);
+    }
+
+    // ─── Seed test user if none exist ────────────────────────
+    const userCount = await User.count();
+    if (userCount === 0) {
+      console.log('[Seed] Creating test user...');
+      const bcrypt = await import('bcryptjs');
+      const passwordHash = await bcrypt.default.hash('password123', 12);
+      const testUser = await User.create({
+        firstName: 'Test',
+        lastName: 'User',
+        email: 'test@example.com',
+        passwordHash: passwordHash,
+        phone: '+91 9000000000',
+      });
+      await Wallet.create({ userId: testUser.id, balance: 500 });
+      console.log(`[Seed] ✅ Test user created: test@example.com / password123`);
     }
 
     app.listen(PORT, () => {

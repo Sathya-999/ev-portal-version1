@@ -20,11 +20,26 @@ const decodeGoogleCredential = (token: string) => {
 };
 
 // Google OAuth success handler — calls real backend
-const handleGoogleSuccess = async (credentialResponse: any) => {
+const handleGoogleSuccess = async (credentialResponse: any, navigate: any) => {
   try {
     const result = await apiGoogleAuth(credentialResponse.credential);
+    
+    if (!result.token) {
+      toast.error('Google authentication failed. Server did not issue a token.');
+      return;
+    }
+    
+    // Verify token is stored
+    const storedToken = localStorage.getItem('token');
+    if (!storedToken) {
+      toast.error('Token storage failed. Please try again.');
+      return;
+    }
+    
     toast.success(`Welcome, ${result.user.firstName}! Redirecting to dashboard...`);
-    setTimeout(() => { window.location.href = '/dashboard'; }, 800);
+    setTimeout(() => {
+      navigate('/dashboard', { replace: true });
+    }, 100);
   } catch (err: any) {
     // Fallback: decode client-side if backend is down
     const decoded = decodeGoogleCredential(credentialResponse.credential);
@@ -37,7 +52,9 @@ const handleGoogleSuccess = async (credentialResponse: any) => {
         picture: decoded.picture,
       }));
       toast.success(`Welcome, ${decoded.given_name || 'User'}! Redirecting...`);
-      setTimeout(() => { window.location.href = '/dashboard'; }, 800);
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 100);
     } else {
       toast.error(err.message || 'Google authentication failed.');
     }
@@ -83,9 +100,12 @@ export const SignIn: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
+    const normalizedEmail = email.trim().toLowerCase();
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       toast.error("Invalid email format. Please use a valid address.");
       return;
     }
@@ -96,16 +116,30 @@ export const SignIn: React.FC = () => {
 
     setLoading(true);
     try {
-      const result = await apiLogin({ email, password });
-      if (!result.token) {
+      const result = await apiLogin({ email: normalizedEmail, password });
+      
+      if (!result || !result.token) {
         toast.error("Authentication failed. Server did not issue a token.");
+        setLoading(false);
         return;
       }
-      toast.success(`Welcome back, ${result.user.firstName}! Redirecting...`);
-      setTimeout(() => navigate("/dashboard"), 600);
+      
+      // Verify token is stored before redirecting
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken) {
+        toast.error("Token storage failed. Please try again.");
+        setLoading(false);
+        return;
+      }
+      
+      toast.success(`Welcome back, ${result.user?.firstName || 'User'}! Redirecting...`);
+      // Use a small delay to ensure localStorage is flushed and navigate properly
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 100);
     } catch (err: any) {
+      console.error('[Auth] Login error:', err);
       toast.error(err.message || "Invalid email or password. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
@@ -115,7 +149,7 @@ export const SignIn: React.FC = () => {
       <div className="space-y-9">
         <div className="flex justify-center">
           <GoogleLogin
-            onSuccess={handleGoogleSuccess}
+            onSuccess={(cred) => handleGoogleSuccess(cred, navigate)}
             onError={handleGoogleError}
             width="400"
             theme="outline"
@@ -210,14 +244,28 @@ export const SignUp: React.FC = () => {
     setLoading(true);
     try {
       const result = await apiSignup({ firstName, lastName, email, password });
-      localStorage.setItem('user_profile', JSON.stringify(result.user));
-      toast.success(`Welcome, ${result.user.firstName}! Account created successfully!`);
+      
+      if (!result.token) {
+        toast.error('Signup failed. Server did not issue a token.');
+        setLoading(false);
+        return;
+      }
+      
+      // Verify token is stored before redirecting
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken) {
+        toast.error('Token storage failed. Please try again.');
+        setLoading(false);
+        return;
+      }
+      
+      toast.success(`Welcome, ${result.user.firstName}! Account created successfully! Please sign in.`);
+      // Redirect to sign in after signup
       setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 800);
+        navigate('/signin', { replace: true });
+      }, 100);
     } catch (err: any) {
       toast.error(err.message || 'Signup failed. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
@@ -227,7 +275,7 @@ export const SignUp: React.FC = () => {
       <div className="space-y-9">
         <div className="flex justify-center">
           <GoogleLogin
-            onSuccess={handleGoogleSuccess}
+            onSuccess={(cred) => handleGoogleSuccess(cred, navigate)}
             onError={handleGoogleError}
             width="400"
             theme="outline"
@@ -384,9 +432,13 @@ export const ResetPassword: React.FC = () => {
     // Consume the reset token so it can't be reused
     resendEmailService.consumeResetToken(token);
 
-    toast.success('Your password has been reset successfully!');
-    // Redirect to login after reset
-    setTimeout(() => navigate('/signin'), 1500);
+    toast.success('Your password has been reset successfully! Redirecting to dashboard...');
+    // Store a flag to indicate password was reset
+    localStorage.setItem('passwordReset', 'true');
+    // Redirect to dashboard after reset
+    setTimeout(() => {
+      navigate('/dashboard', { replace: true });
+    }, 100);
   };
 
   return (

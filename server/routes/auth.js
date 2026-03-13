@@ -10,13 +10,14 @@ const router = Router();
 router.post('/signup', async (req, res) => {
   try {
     const { firstName, lastName, email, password, phone } = req.body;
+    const normalizedEmail = (email || '').trim().toLowerCase();
 
-    if (!firstName || !email || !password) {
+    if (!firstName || !normalizedEmail || !password) {
       return res.status(400).json({ error: 'firstName, email, and password are required.' });
     }
 
     // Check if user already exists
-    const existing = await User.findOne({ where: { email } });
+    const existing = await User.findOne({ where: { email: normalizedEmail } });
     if (existing) {
       return res.status(409).json({ error: 'An account with this email already exists.' });
     }
@@ -29,7 +30,7 @@ router.post('/signup', async (req, res) => {
     const user = await User.create({
       firstName,
       lastName: lastName || '',
-      email,
+      email: normalizedEmail,
       passwordHash,
       phone: phone || '',
     });
@@ -41,7 +42,7 @@ router.post('/signup', async (req, res) => {
     const token = generateToken(user);
 
     // Send welcome email (non-blocking)
-    sendWelcomeEmail(email, firstName).catch(err =>
+    sendWelcomeEmail(normalizedEmail, firstName).catch(err =>
       console.warn('[Email] Welcome email failed:', err.message)
     );
 
@@ -69,13 +70,14 @@ router.post('/signup', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = (email || '').trim().toLowerCase();
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ error: 'email and password are required.' });
     }
 
     const user = await User.findOne({
-      where: { email },
+      where: { email: normalizedEmail },
       include: [{ association: 'wallet', attributes: ['balance'] }],
     });
 
@@ -130,25 +132,26 @@ router.post('/google', async (req, res) => {
     const decoded = JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'));
 
     const { email, given_name, family_name, sub, picture } = decoded;
+    const normalizedEmail = (email || '').trim().toLowerCase();
 
-    if (!email) {
+    if (!normalizedEmail) {
       return res.status(400).json({ error: 'Could not extract email from Google token.' });
     }
 
     // Find or create user
-    let user = await User.findOne({ where: { email } });
+    let user = await User.findOne({ where: { email: normalizedEmail } });
 
     if (!user) {
       user = await User.create({
         firstName: given_name || 'User',
         lastName: family_name || '',
-        email,
+        email: normalizedEmail,
         googleId: sub,
         picture: picture || '',
       });
       await Wallet.create({ userId: user.id, balance: 0 });
 
-      sendWelcomeEmail(email, given_name || 'User').catch(err =>
+      sendWelcomeEmail(normalizedEmail, given_name || 'User').catch(err =>
         console.warn('[Email] Welcome email failed:', err.message)
       );
     } else {
