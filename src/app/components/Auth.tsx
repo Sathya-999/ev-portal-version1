@@ -118,27 +118,31 @@ export const SignIn: React.FC = () => {
     try {
       const result = await apiLogin({ email: normalizedEmail, password });
       
-      if (!result || !result.token) {
-        toast.error("Authentication failed. Server did not issue a token.");
-        setLoading(false);
-        return;
+      if (!result || typeof result !== 'object') {
+        throw new Error('Invalid response from server');
+      }
+      
+      if (!result.token) {
+        throw new Error('Authentication token not received');
       }
       
       // Verify token is stored before redirecting
       const storedToken = localStorage.getItem('token');
       if (!storedToken) {
-        toast.error("Token storage failed. Please try again.");
-        setLoading(false);
-        return;
+        throw new Error('Failed to store authentication token');
       }
       
-      toast.success(`Welcome back, ${result.user?.firstName || 'User'}! Redirecting...`);
+      toast.success(`Welcome back, ${result.user?.firstName || 'User'}! Redirecting to dashboard...`);
+      // Clear form
+      setEmail('');
+      setPassword('');
+      
       // Use a small delay to ensure localStorage is flushed and navigate properly
       setTimeout(() => {
         navigate('/dashboard', { replace: true });
-      }, 100);
+      }, 500);
     } catch (err: any) {
-      console.error('[Auth] Login error:', err);
+      console.error('[Login Error]', err);
       toast.error(err.message || "Invalid email or password. Please try again.");
       setLoading(false);
     }
@@ -245,26 +249,33 @@ export const SignUp: React.FC = () => {
     try {
       const result = await apiSignup({ firstName, lastName, email, password });
       
+      if (!result || typeof result !== 'object') {
+        throw new Error('Invalid response from server');
+      }
+      
       if (!result.token) {
-        toast.error('Signup failed. Server did not issue a token.');
-        setLoading(false);
-        return;
+        throw new Error('Authentication token not received');
       }
       
       // Verify token is stored before redirecting
       const storedToken = localStorage.getItem('token');
       if (!storedToken) {
-        toast.error('Token storage failed. Please try again.');
-        setLoading(false);
-        return;
+        throw new Error('Failed to store authentication token');
       }
       
-      toast.success(`Welcome, ${result.user.firstName}! Account created successfully! Please sign in.`);
-      // Redirect to sign in after signup
+      toast.success(`Welcome, ${result.user?.firstName || 'User'}! Account created. Redirecting to sign in...`);
+      // Clear form
+      setFirstName('');
+      setLastName('');
+      setEmail('');
+      setManualPassword('');
+      
+      // Redirect to sign in
       setTimeout(() => {
         navigate('/signin', { replace: true });
-      }, 100);
+      }, 500);
     } catch (err: any) {
+      console.error('[Signup Error]', err);
       toast.error(err.message || 'Signup failed. Please try again.');
       setLoading(false);
     }
@@ -438,7 +449,7 @@ export const ResetPassword: React.FC = () => {
     // Redirect to dashboard after reset
     setTimeout(() => {
       navigate('/dashboard', { replace: true });
-    }, 100);
+    }, 500);
   };
 
   return (
